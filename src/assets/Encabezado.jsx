@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./css/estilos.css";
+import "./estilos.css";
 
 const Encabezado = () => {
   const [menuActive, setMenuActive] = useState(false);
