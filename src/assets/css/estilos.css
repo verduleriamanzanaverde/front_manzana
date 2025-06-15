@@ -1,0 +1,138 @@
+/* estilos.css - Menú Responsivo */
+
+/* Estilos generales del header */
+header {
+  background-color: #2ecc71; /* Verde principal */
+  color: white;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Logo */
+.logo {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+/* Navegación principal */
+nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+nav a {
+  color: white;
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  padding: 0.5rem 0;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+nav a:hover {
+  color: #f1f1f1;
+}
+
+/* Efecto subrayado al hover */
+nav a::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background-color: white;
+  transition: width 0.3s ease;
+}
+
+nav a:hover::after {
+  width: 100%;
+}
+
+/* Menú hamburguesa para móviles */
+.menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .container {
+    flex-wrap: wrap;
+  }
+  
+  .menu-btn {
+    display: block;
+    order: 1;
+  }
+  
+  .logo {
+    order: 2;
+    flex-grow: 1;
+    text-align: center;
+    font-size: 1.5rem;
+  }
+  
+  nav {
+    display: none;
+    order: 3;
+    width: 100%;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 1rem;
+  }
+  
+  nav.active {
+    display: flex;
+  }
+  
+  nav a {
+    padding: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  nav a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  nav a::after {
+    display: none;
+  }
+}
+
+/* Transiciones suaves */
+header, nav a {
+  transition: all 0.3s ease;
+}
+
+/* Modo oscuro opcional */
+@media (prefers-color-scheme: dark) {
+  header {
+    background-color: #27ae60; /* Verde más oscuro para modo oscuro */
+  }
+}
