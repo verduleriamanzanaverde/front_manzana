@@ -1,4 +1,4 @@
-import Speech from "../../Speech.jsx"
+import Speech from "./assets/Speech.jsx"
 import Encabezado from "./assets/Encabezado.jsx"
 
 
