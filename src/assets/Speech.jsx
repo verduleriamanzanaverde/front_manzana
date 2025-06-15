@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import "./speech.css"
+import "./speech.css";
 
 const Speech = () => {
   // Cargar datos iniciales desde localStorage
@@ -21,8 +21,33 @@ const Speech = () => {
   const [total, setTotal] = useState(loadFromLocalStorage('speechApp_total', 0));
   const [history, setHistory] = useState(loadFromLocalStorage('speechApp_history', []));
   const [feedback, setFeedback] = useState("");
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
   const recognitionRef = useRef(null);
   const restartTimeoutRef = useRef(null);
+
+  // Cargar productos desde el backend al iniciar
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      setConnectionError(false);
+      try {
+        const response = await fetch("https://back-manzana.onrender.com/productos");
+        if (!response.ok) throw new Error("Error al cargar productos");
+        const data = await response.json();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        setFeedback("Error al cargar productos del almacén");
+        setConnectionError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Guardar en localStorage cuando cambien los datos
   useEffect(() => {
@@ -38,16 +63,7 @@ const Speech = () => {
     saveToLocalStorage('speechApp_total', total);
   }, [history, total]);
 
-  // Base de datos de productos ampliada
-  const productDatabase = {
-    'manzana': 150, 'pera': 180, 'banana': 120, 'naranja': 100,
-    'limón': 200, 'mandarina': 80, 'kiwi': 250, 'durazno': 220,
-    'pan': 50, 'leche': 120, 'azúcar': 90, 'harina': 80,
-    'arroz': 110, 'fideos': 85, 'galletas': 75, 'yogur': 65,
-    'papa': 70, 'cebolla': 60, 'tomate': 90, 'zanahoria': 55,
-    'huevo': 15, 'queso': 200, 'jamon': 180, 'cafe': 220
-  };
-
+  // Configuración del reconocimiento de voz
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -97,9 +113,51 @@ const Speech = () => {
         recognitionRef.current.stop();
       }
     };
-  }, []);
+  }, [products]); // Ahora depende de products para evitar cierres durante la carga
 
-  const processVoiceCommand = (text) => {
+  // Función para buscar productos en el backend
+  const searchProductInBackend = async (productName) => {
+    if (products.length === 0) return null;
+
+    try {
+      // Normalizar el nombre del producto
+      const normalized = productName
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+
+      // Primero buscar coincidencia exacta
+      const exactMatch = products.find(p => {
+        const productNameNormalized = p.nombre
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+        return productNameNormalized === normalized;
+      });
+      
+      if (exactMatch) return exactMatch.precio;
+
+      // Si no hay coincidencia exacta, buscar coincidencia parcial
+      let bestMatch = null;
+      let maxLength = 0;
+      
+      for (const product of products) {
+        const productNameNormalized = product.nombre
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+        
+        if (normalized.includes(productNameNormalized) && productNameNormalized.length > maxLength) {
+          bestMatch = product;
+          maxLength = productNameNormalized.length;
+        }
+      }
+
+      return bestMatch ? bestMatch.precio : null;
+    } catch (error) {
+      console.error("Error buscando producto:", error);
+      return null;
+    }
+  };
+
+  const processVoiceCommand = async (text) => {
     if (text.split(' ').length < 2 && !text.match(/^(total|reiniciar)/i)) {
       console.log("Comando demasiado corto, ignorado:", text);
       return;
@@ -132,7 +190,8 @@ const Speech = () => {
       let detectedFruit = (match[3] || match[2]).trim().toLowerCase();
       detectedFruit = cleanProductName(detectedFruit);
       
-      const productPrice = findProductPrice(detectedFruit);
+      // Buscar el producto en el backend
+      const productPrice = await searchProductInBackend(detectedFruit);
       
       if (productPrice) {
         const itemTotal = productPrice * parseInt(detectedQuantity);
@@ -168,17 +227,16 @@ const Speech = () => {
   };
 
   const announceTotal = () => {
-    let historia = localStorage.getItem("speechApp_history")
-    let total2 = localStorage.getItem("speechApp_total")
-    console.log("el total es: " + total2)
-    console.log(historia.length)
-    if (historia.length === 0) {
+    const savedHistory = loadFromLocalStorage('speechApp_history', []);
+    const savedTotal = loadFromLocalStorage('speechApp_total', 0);
+    
+    if (savedHistory.length === 0) {
       setFeedback("No hay productos en la lista");
       speakFeedback("Aún no hay productos agregados");
       return;
     }
 
-    const totalMessage = `El total es ${total2} pesos.`;
+    const totalMessage = `El total acumulado es ${savedTotal} pesos por ${savedHistory.length} productos.`;
     setFeedback(totalMessage);
     speakFeedback(totalMessage);
     
@@ -201,31 +259,6 @@ const Speech = () => {
     return name.replace(/^(las|los|la|el|unos|unas|un|una)\s+/i, '')
                .replace(/\s+$/i, '')
                .replace(/\s*\b\d+\b\s*/i, '');
-  };
-
-  const findProductPrice = (productName) => {
-    const normalized = productName
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z]/g, "");
-
-    for (const [key, value] of Object.entries(productDatabase)) {
-      if (normalized === key.normalize("NFD").replace(/[\u0300-\u036f]/g, "")) {
-        return value;
-      }
-    }
-
-    let bestMatch = null;
-    let maxLength = 0;
-    
-    for (const [key, value] of Object.entries(productDatabase)) {
-      const normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      if (normalized.includes(normalizedKey) && normalizedKey.length > maxLength) {
-        bestMatch = value;
-        maxLength = normalizedKey.length;
-      }
-    }
-
-    return bestMatch;
   };
 
   const getUnit = (text) => {
@@ -276,9 +309,43 @@ const Speech = () => {
     speakFeedback("Total reiniciado");
   };
 
+  const reloadProducts = async () => {
+    setIsLoading(true);
+    setConnectionError(false);
+    try {
+      const response = await fetch("https://back-manzana.onrender.com/productos");
+      if (!response.ok) throw new Error("Error al cargar productos");
+      const data = await response.json();
+      console.log(data)
+      setProducts(data);
+      setFeedback("Productos actualizados correctamente");
+    } catch (error) {
+      console.error("Error recargando productos:", error);
+      setFeedback("Error al actualizar productos");
+      setConnectionError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="speech-container">
       <h1 className="title">Sistema de Voz para Almacén</h1>
+      
+      {isLoading && (
+        <div className="loading">
+          <p>Cargando productos del almacén...</p>
+        </div>
+      )}
+      
+      {connectionError && (
+        <div className="error-connection">
+          <p>Error de conexión con el servidor</p>
+          <button onClick={reloadProducts} className="retry-button">
+            Reintentar
+          </button>
+        </div>
+      )}
       
       <div className="instructions">
         <p>Instrucciones:</p>
@@ -294,7 +361,7 @@ const Speech = () => {
       <div className="controls">
         <button 
           onClick={startRecognition} 
-          disabled={isListening}
+          disabled={isListening || isLoading}
           className={`mic-button ${isListening ? 'listening' : ''}`}
         >
           {isListening ? (
@@ -304,11 +371,18 @@ const Speech = () => {
           )}
         </button>
         
-        <button onClick={stopRecognition} disabled={!isListening} className="stop-button">
+        <button 
+          onClick={stopRecognition} 
+          disabled={!isListening} 
+          className="stop-button"
+        >
           Detener Micrófono
         </button>
         
-        <button onClick={resetAll} className="reset-button">
+        <button 
+          onClick={resetAll} 
+          className="reset-button"
+        >
           Reiniciar Todo
         </button>
       </div>
